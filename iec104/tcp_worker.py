@@ -6,7 +6,7 @@ import queue
 import socket
 import threading
 
-from .protocol import APDUParser, build_general_interrogation, build_s_frame, build_u_frame
+from .protocol import APDUParser, build_command, build_general_interrogation, build_s_frame, build_u_frame
 
 
 STARTDT_ACT = 0x07
@@ -72,6 +72,13 @@ class TCPWorker:
         if not self.started:
             raise ConnectionError("IEC104-Datenübertragung ist noch nicht gestartet")
         self.send(build_general_interrogation(common_address, self.send_sequence, self.receive_sequence))
+        self.send_sequence = (self.send_sequence + 1) & 0x7FFF
+
+    def send_command(self, common_address: int, ioa: int, type_id: int, value, select: bool, originator_address: int = 0) -> None:
+        if not self.started:
+            raise ConnectionError("IEC104-Datenübertragung ist noch nicht gestartet")
+        frame = build_command(common_address, ioa, type_id, value, select, self.send_sequence, self.receive_sequence, originator_address)
+        self.send(frame)
         self.send_sequence = (self.send_sequence + 1) & 0x7FFF
 
     def _run(self) -> None:

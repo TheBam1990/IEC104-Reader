@@ -1,7 +1,7 @@
 import struct
 import unittest
 
-from iec104.protocol import APDUParser, build_general_interrogation, build_s_frame, build_u_frame, decode_asdu
+from iec104.protocol import APDUParser, build_command, build_general_interrogation, build_s_frame, build_u_frame, decode_asdu
 
 
 class ProtocolTests(unittest.TestCase):
@@ -35,6 +35,22 @@ class ProtocolTests(unittest.TestCase):
     def test_single_point(self):
         data = bytes((1, 1, 20, 0, 1, 0)) + (9).to_bytes(3, "little") + b"\x01"
         self.assertIs(decode_asdu(data)[0].value, True)
+
+    def test_double_command_select(self):
+        frame = APDUParser().feed(build_command(2019, 4251733, 46, 2, True, 4, 7))[0]
+        self.assertEqual((frame.send_sequence, frame.receive_sequence), (4, 7))
+        self.assertEqual(frame.asdu[:6], bytes((46, 1, 6, 0, 0xE3, 0x07)))
+        self.assertEqual(int.from_bytes(frame.asdu[6:9], "little"), 4251733)
+        self.assertEqual(frame.asdu[9], 0x82)
+
+    def test_scaled_execute_command(self):
+        frame = APDUParser().feed(build_command(1, 99, 49, -123, False, 0, 0))[0]
+        self.assertEqual(struct.unpack("<h", frame.asdu[9:11])[0], -123)
+        self.assertEqual(frame.asdu[11], 0)
+
+    def test_invalid_single_command_is_rejected(self):
+        with self.assertRaises(ValueError):
+            build_command(1, 1, 45, 2, False, 0, 0)
 
 
 if __name__ == "__main__":

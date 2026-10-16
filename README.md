@@ -1,6 +1,6 @@
 # IEC104 Reader für Windows
 
-Portable grafische Anwendung zum Lesen und Analysieren von IEC 60870-5-104 über TCP/IP. Das Programm arbeitet als lesender IEC104-Master und sendet keine Schaltbefehle.
+Portable grafische Anwendung zum Lesen, Analysieren und kontrollierten Senden von IEC 60870-5-104 über TCP/IP.
 
 ## Funktionen
 
@@ -17,6 +17,10 @@ Portable grafische Anwendung zum Lesen und Analysieren von IEC 60870-5-104 über
 - Faktor pro Zahlenwert; Originalwert und berechneter Wert bleiben gleichzeitig sichtbar
 - eigenes Live-Filterfeld über jeder Tabellenspalte; mehrere Filter wirken gemeinsam
 - CSV-Export der aktuell sichtbaren Tabellenzeilen
+- Befehlsbereich für Einzel-, Doppel- und Sollwertbefehle
+- getrennte Aktionen für Select/Auswahl und Execute/Ausführung
+- optionale CP56-Zeitstempel bei Befehlen
+- Sicherheitsrückfrage vor jedem einzelnen Befehl
 - lokale Speicherung der Verbindungseinstellungen und Faktoren
 
 ## Bedienung
@@ -38,8 +42,10 @@ Unbekannte ASDUs bleiben vollständig im Telegrammfenster sichtbar, auch wenn da
 
 ## Sicherheit
 
-- Das Programm sendet keine IEC104-Schaltbefehle.
-- Es sendet ausschließlich Verbindungssteuerung, Bestätigungen und Generalabfragen.
+- Jeder Befehl muss über eine Sicherheitsrückfrage ausdrücklich bestätigt werden.
+- Auswahl und Ausführung sind getrennte Schaltflächen; ein Select wird nicht automatisch ausgeführt.
+- Einzelbefehl: `0` oder `1`. Doppelbefehl: `1` für AUS und `2` für EIN.
+- Die Bedienperson muss CA, IOA, Befehlstyp und Wert anhand der Anlagendokumentation prüfen.
 - Es verwendet keine Cloud-Dienste und keine Telemetrie.
 - Einstellungen und Faktoren werden ausschließlich lokal gespeichert.
 

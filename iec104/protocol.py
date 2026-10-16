@@ -22,6 +22,12 @@ TYPE_NAMES = {
     32: "M_ST_TB_1 Stufenstellung CP56", 33: "M_BO_TB_1 Bitmuster CP56",
     34: "M_ME_TD_1 Messwert normiert CP56", 35: "M_ME_TE_1 Messwert skaliert CP56",
     36: "M_ME_TF_1 Messwert Gleitkomma CP56", 37: "M_IT_TB_1 Zählwert CP56",
+    45: "C_SC_NA_1 Einzelbefehl", 46: "C_DC_NA_1 Doppelbefehl",
+    48: "C_SE_NA_1 Sollwert normiert", 49: "C_SE_NB_1 Sollwert skaliert",
+    50: "C_SE_NC_1 Sollwert Gleitkomma",
+    58: "C_SC_TA_1 Einzelbefehl CP56", 59: "C_DC_TA_1 Doppelbefehl CP56",
+    61: "C_SE_TA_1 Sollwert normiert CP56", 62: "C_SE_TB_1 Sollwert skaliert CP56",
+    63: "C_SE_TC_1 Sollwert Gleitkomma CP56",
     100: "C_IC_NA_1 Generalabfrage", 103: "C_CS_NA_1 Zeitsynchronisation",
 }
 
@@ -128,6 +134,57 @@ def build_general_interrogation(common_address: int, send_sequence: int, receive
     if not 0 <= common_address <= 0xFFFF:
         raise ValueError("Common Address muss zwischen 0 und 65535 liegen")
     asdu = bytes((100, 1, 6, 0)) + struct.pack("<H", common_address) + b"\x00\x00\x00\x14"
+    return build_i_frame(asdu, send_sequence, receive_sequence)
+
+
+def cp56_now() -> bytes:
+    now = datetime.now()
+    milliseconds = now.second * 1000 + now.microsecond // 1000
+    return struct.pack("<HBBBBB", milliseconds, now.minute, now.hour, now.day, now.month, now.year % 100)
+
+
+def build_command(
+    common_address: int,
+    ioa: int,
+    type_id: int,
+    value: float | int | bool,
+    select: bool,
+    send_sequence: int,
+    receive_sequence: int,
+    originator_address: int = 0,
+) -> bytes:
+    """Build a standard activation command I-frame."""
+    if not 0 <= common_address <= 0xFFFF:
+        raise ValueError("Common Address muss zwischen 0 und 65535 liegen")
+    if not 0 <= ioa <= 0xFFFFFF:
+        raise ValueError("IOA muss zwischen 0 und 16777215 liegen")
+    if not 0 <= originator_address <= 255:
+        raise ValueError("Originator Address muss zwischen 0 und 255 liegen")
+    qualifier = 0x80 if select else 0
+    if type_id in (45, 58):
+        numeric = int(value)
+        if numeric not in (0, 1): raise ValueError("Einzelbefehl erlaubt nur 0 oder 1")
+        payload = bytes((numeric | qualifier,))
+    elif type_id in (46, 59):
+        numeric = int(value)
+        if numeric not in (1, 2): raise ValueError("Doppelbefehl erlaubt nur 1 (AUS) oder 2 (EIN)")
+        payload = bytes((numeric | qualifier,))
+    elif type_id in (48, 61):
+        numeric = float(value)
+        if not -1.0 <= numeric <= 1.0: raise ValueError("Normierter Sollwert muss zwischen -1 und +1 liegen")
+        raw = max(-32768, min(32767, round(numeric * 32767)))
+        payload = struct.pack("<hB", raw, qualifier)
+    elif type_id in (49, 62):
+        numeric = int(value)
+        if not -32768 <= numeric <= 32767: raise ValueError("Skalierter Sollwert muss zwischen -32768 und 32767 liegen")
+        payload = struct.pack("<hB", numeric, qualifier)
+    elif type_id in (50, 63):
+        payload = struct.pack("<fB", float(value), qualifier)
+    else:
+        raise ValueError(f"Nicht unterstützter Befehlstyp {type_id}")
+    if type_id in (58, 59, 61, 62, 63):
+        payload += cp56_now()
+    asdu = bytes((type_id, 1, 6, originator_address)) + struct.pack("<H", common_address) + ioa.to_bytes(3, "little") + payload
     return build_i_frame(asdu, send_sequence, receive_sequence)
 
 
