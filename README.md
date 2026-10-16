@@ -1,6 +1,7 @@
 # IEC104 Reader für Windows
 
 Portable grafische Anwendung zum Lesen, Analysieren und kontrollierten Senden von IEC 60870-5-104 über TCP/IP.
+https://github.com/TheBam1990/IEC104-Reader/releases/tag/v1.2.0
 
 ## Funktionen
 
