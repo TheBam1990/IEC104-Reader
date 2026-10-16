@@ -1,0 +1,41 @@
+import struct
+import unittest
+
+from iec104.protocol import APDUParser, build_general_interrogation, build_s_frame, build_u_frame, decode_asdu
+
+
+class ProtocolTests(unittest.TestCase):
+    def test_fragmented_startdt(self):
+        parser = APDUParser()
+        self.assertEqual(parser.feed(b"\x68\x04\x0b"), [])
+        frame = parser.feed(b"\x00\x00\x00")[0]
+        self.assertEqual((frame.kind, frame.utype), ("U", 0x08))
+
+    def test_s_frame_sequence(self):
+        frame = APDUParser().feed(build_s_frame(123))[0]
+        self.assertEqual((frame.kind, frame.receive_sequence), ("S", 123))
+
+    def test_general_interrogation(self):
+        frame = APDUParser().feed(build_general_interrogation(2019, 2, 3))[0]
+        self.assertEqual((frame.kind, frame.send_sequence, frame.receive_sequence), ("I", 2, 3))
+        self.assertEqual(frame.asdu[:6], bytes((100, 1, 6, 0, 0xE3, 0x07)))
+
+    def test_scaled_values_with_sequence_addresses(self):
+        header = bytes((11, 0x82, 20, 0)) + struct.pack("<H", 2019)
+        objects = (100).to_bytes(3, "little") + struct.pack("<hB", 45, 0) + struct.pack("<hB", -12, 0)
+        values = decode_asdu(header + objects)
+        self.assertEqual([(v.ioa, v.value, v.quality) for v in values], [(100, 45, "good"), (101, -12, "good")])
+
+    def test_float_and_invalid_quality(self):
+        data = bytes((13, 1, 3, 0, 1, 0)) + (7).to_bytes(3, "little") + struct.pack("<fB", 12.5, 0x80)
+        value = decode_asdu(data)[0]
+        self.assertAlmostEqual(value.value, 12.5)
+        self.assertEqual(value.quality, "IV")
+
+    def test_single_point(self):
+        data = bytes((1, 1, 20, 0, 1, 0)) + (9).to_bytes(3, "little") + b"\x01"
+        self.assertIs(decode_asdu(data)[0].value, True)
+
+
+if __name__ == "__main__":
+    unittest.main()

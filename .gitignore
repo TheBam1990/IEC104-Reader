@@ -1,0 +1,9 @@
+.venv/
+build/
+dist/
+__pycache__/
+*.pyc
+IEC104-Reader.json
+IEC104-Telegrammverkehr.txt
+*.zip
+SHA256SUMS*.txt
