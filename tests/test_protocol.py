@@ -1,7 +1,7 @@
 import struct
 import unittest
 
-from iec104.protocol import APDUParser, build_command, build_general_interrogation, build_s_frame, build_u_frame, decode_asdu
+from iec104.protocol import APDUParser, build_asdu, build_command, build_general_interrogation, build_parameter_asdu, build_s_frame, build_standard_asdu, build_u_frame, decode_asdu, parse_hex_bytes
 
 
 class ProtocolTests(unittest.TestCase):
@@ -51,6 +51,31 @@ class ProtocolTests(unittest.TestCase):
     def test_invalid_single_command_is_rejected(self):
         with self.assertRaises(ValueError):
             build_command(1, 1, 45, 2, False, 0, 0)
+
+    def test_step_and_bitstring_commands(self):
+        step = APDUParser().feed(build_command(1, 7, 47, 2, True, 3, 4))[0]
+        bits = APDUParser().feed(build_command(1, 8, 51, 0xAABBCCDD, False, 5, 6))[0]
+        self.assertEqual(step.asdu[9], 0x82)
+        self.assertEqual(int.from_bytes(bits.asdu[9:13], "little"), 0xAABBCCDD)
+        self.assertEqual(len(bits.asdu[9:]), 4)
+        with self.assertRaises(ValueError):
+            build_command(1, 8, 51, 1, True, 0, 0)
+
+    def test_standard_requests(self):
+        counter = build_standard_asdu(101, 2019, qualifier=5, originator_address=2)
+        read = build_standard_asdu(102, 2019, ioa=123, originator_address=2)
+        clock = build_standard_asdu(103, 2019)
+        self.assertEqual(counter[:6], bytes((101, 1, 6, 2, 0xE3, 0x07)))
+        self.assertEqual(counter[-1], 5)
+        self.assertEqual(int.from_bytes(read[6:9], "little"), 123)
+        self.assertEqual(len(clock), 16)
+
+    def test_parameter_and_raw_asdu(self):
+        parameter = build_parameter_asdu(1, 99, 111, -123, 2, 3)
+        self.assertEqual(parameter[:6], bytes((111, 1, 6, 3, 1, 0)))
+        self.assertEqual(struct.unpack("<h", parameter[9:11])[0], -123)
+        raw = build_asdu(122, 1, 5, parse_hex_bytes("AA:55"), cause=6)
+        self.assertEqual(raw[-2:], b"\xAA\x55")
 
 
 if __name__ == "__main__":

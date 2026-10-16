@@ -17,9 +17,16 @@ Portable grafische Anwendung zum Lesen, Analysieren und kontrollierten Senden vo
 - Faktor pro Zahlenwert; Originalwert und berechneter Wert bleiben gleichzeitig sichtbar
 - eigenes Live-Filterfeld über jeder Tabellenspalte; mehrere Filter wirken gemeinsam
 - CSV-Export der aktuell sichtbaren Tabellenzeilen
-- Befehlsbereich für Einzel-, Doppel- und Sollwertbefehle
+- platzsparende Sendezentrale in einem eigenen Dialogfenster
+- Einzel-, Doppel-, Stufen- und Bitmusterbefehle
+- normierte, skalierte und Gleitkomma-Sollwerte
 - getrennte Aktionen für Select/Auswahl und Execute/Ausführung
 - optionale CP56-Zeitstempel bei Befehlen
+- General- und Zählerabfrage, Einzelwert lesen, Zeitsynchronisation, Test,
+  Prozessreset und Verzögerungsermittlung
+- Parameterwerte und Parameteraktivierung
+- frei konfigurierbare ASDUs und Vorlagen für die IEC104-Dateitypen 120–126
+- ASDU-Vorschau in Hexadezimaldarstellung
 - Sicherheitsrückfrage vor jedem einzelnen Befehl
 - lokale Speicherung der Verbindungseinstellungen und Faktoren
 
@@ -33,6 +40,32 @@ Portable grafische Anwendung zum Lesen, Analysieren und kontrollierten Senden vo
 6. Empfangene Werte erscheinen rechts in der Tabelle.
 
 Die Filterfelder befinden sich direkt über den jeweiligen Spalten. Mehrere ausgefüllte Filter werden als UND-Verknüpfung ausgewertet. Mit **Alle Filter löschen** oder Escape werden alle Zeilen wieder eingeblendet.
+
+## Telegramme senden
+
+Die Schaltfläche **Senden ...** öffnet die Sendezentrale, ohne das
+Hauptfenster zu vergrößern. Sie enthält getrennte Reiter für:
+
+- **Standard:** Generalabfrage, Zählerabfrage, IOA lesen, Zeitsynchronisation,
+  Testbefehl, Prozessreset und Verzögerungsermittlung
+- **Schalten:** Einzel-, Doppel-, Stufen- und Bitmusterbefehle, wahlweise mit
+  CP56-Zeitstempel sowie getrennt als Auswahl oder Ausführung
+- **Sollwerte:** normierte, skalierte und Gleitkommawerte, ebenfalls mit
+  Select-before-operate und optionalem CP56-Zeitstempel
+- **Parameter:** Typen 110–113 einschließlich Qualifier
+- **ASDU / Datei:** frei bearbeitbarer Typ, VSQ, COT, IOA und Hex-Payload sowie
+  Vorlagen für die standardisierten Datei-ASDUs 120–126
+
+Common Address und Originator werden oben im Hauptfenster einmal eingestellt
+und von allen Reitern verwendet. Vor dem Senden wird die erzeugte ASDU als
+Hexfolge angezeigt. Schreibende und potenziell gefährliche Aktionen verlangen
+eine ausdrückliche Bestätigung.
+
+Die Dateivorlagen stellen bewusst keinen automatischen Dateitransfer dar. Ein
+vollständiger Transfer ist zustandsbehaftet und muss hinsichtlich Dateiname,
+Abschnitten, Segmenten und Bestätigungen exakt zur Gegenstelle passen. Die
+Vorlagen erlauben das kontrollierte Erzeugen solcher ASDUs anhand der jeweiligen
+Gerätedokumentation.
 
 ## Unterstützte Überwachungs-ASDUs
 

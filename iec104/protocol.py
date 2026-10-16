@@ -23,12 +23,19 @@ TYPE_NAMES = {
     34: "M_ME_TD_1 Messwert normiert CP56", 35: "M_ME_TE_1 Messwert skaliert CP56",
     36: "M_ME_TF_1 Messwert Gleitkomma CP56", 37: "M_IT_TB_1 Zählwert CP56",
     45: "C_SC_NA_1 Einzelbefehl", 46: "C_DC_NA_1 Doppelbefehl",
+    47: "C_RC_NA_1 Stufenbefehl",
     48: "C_SE_NA_1 Sollwert normiert", 49: "C_SE_NB_1 Sollwert skaliert",
-    50: "C_SE_NC_1 Sollwert Gleitkomma",
+    50: "C_SE_NC_1 Sollwert Gleitkomma", 51: "C_BO_NA_1 Bitmusterbefehl",
     58: "C_SC_TA_1 Einzelbefehl CP56", 59: "C_DC_TA_1 Doppelbefehl CP56",
+    60: "C_RC_TA_1 Stufenbefehl CP56",
     61: "C_SE_TA_1 Sollwert normiert CP56", 62: "C_SE_TB_1 Sollwert skaliert CP56",
-    63: "C_SE_TC_1 Sollwert Gleitkomma CP56",
-    100: "C_IC_NA_1 Generalabfrage", 103: "C_CS_NA_1 Zeitsynchronisation",
+    63: "C_SE_TC_1 Sollwert Gleitkomma CP56", 64: "C_BO_TA_1 Bitmusterbefehl CP56",
+    100: "C_IC_NA_1 Generalabfrage", 101: "C_CI_NA_1 Zählerabfrage",
+    102: "C_RD_NA_1 Leseabfrage", 103: "C_CS_NA_1 Zeitsynchronisation",
+    104: "C_TS_NA_1 Testbefehl", 105: "C_RP_NA_1 Prozessreset",
+    106: "C_CD_NA_1 Verzögerungsermittlung",
+    110: "P_ME_NA_1 Parameter normiert", 111: "P_ME_NB_1 Parameter skaliert",
+    112: "P_ME_NC_1 Parameter Gleitkomma", 113: "P_AC_NA_1 Parameteraktivierung",
 }
 
 COT_NAMES = {
@@ -137,6 +144,57 @@ def build_general_interrogation(common_address: int, send_sequence: int, receive
     return build_i_frame(asdu, send_sequence, receive_sequence)
 
 
+def parse_hex_bytes(text: str) -> bytes:
+    cleaned = text.replace("0x", "").replace("0X", "")
+    for separator in (" ", "\t", "\r", "\n", ",", ";", ":", "-"):
+        cleaned = cleaned.replace(separator, "")
+    if not cleaned:
+        return b""
+    if len(cleaned) % 2:
+        raise ValueError("Hexdaten benötigen zwei Zeichen pro Byte")
+    try:
+        return bytes.fromhex(cleaned)
+    except ValueError as error:
+        raise ValueError("Hexdaten enthalten ungültige Zeichen") from error
+
+
+def build_asdu(type_id: int, common_address: int, ioa: int, payload: bytes = b"",
+               cause: int = 6, originator_address: int = 0, vsq: int = 1) -> bytes:
+    for name, value, maximum in (
+        ("Typ", type_id, 255), ("VSQ", vsq, 255), ("COT", cause, 255),
+        ("Originator", originator_address, 255), ("Common Address", common_address, 65535),
+        ("IOA", ioa, 0xFFFFFF),
+    ):
+        if not 0 <= value <= maximum:
+            raise ValueError(f"{name} muss zwischen 0 und {maximum} liegen")
+    if len(payload) > 240:
+        raise ValueError("ASDU-Nutzdaten sind zu lang")
+    return bytes((type_id, vsq, cause, originator_address)) + struct.pack("<H", common_address) + ioa.to_bytes(3, "little") + payload
+
+
+def build_standard_asdu(type_id: int, common_address: int, ioa: int = 0,
+                        qualifier: int = 0, originator_address: int = 0) -> bytes:
+    if type_id == 100:
+        payload = bytes((qualifier or 20,))
+    elif type_id == 101:
+        payload = bytes((qualifier,))
+    elif type_id == 102:
+        payload = b""
+    elif type_id == 103:
+        payload = cp56_now()
+    elif type_id == 104:
+        payload = b"\xAA\x55"
+    elif type_id == 105:
+        payload = bytes((qualifier,))
+    elif type_id == 106:
+        if not 0 <= qualifier <= 65535:
+            raise ValueError("Verzögerung muss zwischen 0 und 65535 ms liegen")
+        payload = struct.pack("<H", qualifier)
+    else:
+        raise ValueError(f"Nicht unterstützte Standard-ASDU {type_id}")
+    return build_asdu(type_id, common_address, ioa, payload, originator_address=originator_address)
+
+
 def cp56_now() -> bytes:
     now = datetime.now()
     milliseconds = now.second * 1000 + now.microsecond // 1000
@@ -169,6 +227,10 @@ def build_command(
         numeric = int(value)
         if numeric not in (1, 2): raise ValueError("Doppelbefehl erlaubt nur 1 (AUS) oder 2 (EIN)")
         payload = bytes((numeric | qualifier,))
+    elif type_id in (47, 60):
+        numeric = int(value)
+        if numeric not in (1, 2): raise ValueError("Stufenbefehl erlaubt nur 1 (TIEFER) oder 2 (HÖHER)")
+        payload = bytes((numeric | qualifier,))
     elif type_id in (48, 61):
         numeric = float(value)
         if not -1.0 <= numeric <= 1.0: raise ValueError("Normierter Sollwert muss zwischen -1 und +1 liegen")
@@ -180,12 +242,38 @@ def build_command(
         payload = struct.pack("<hB", numeric, qualifier)
     elif type_id in (50, 63):
         payload = struct.pack("<fB", float(value), qualifier)
+    elif type_id in (51, 64):
+        numeric = int(value)
+        if not 0 <= numeric <= 0xFFFFFFFF: raise ValueError("Bitmuster muss zwischen 0 und 4294967295 liegen")
+        if select: raise ValueError("Bitmusterbefehle besitzen kein Select-Bit; bitte direkt ausführen")
+        payload = struct.pack("<I", numeric)
     else:
         raise ValueError(f"Nicht unterstützter Befehlstyp {type_id}")
-    if type_id in (58, 59, 61, 62, 63):
+    if type_id in (58, 59, 60, 61, 62, 63, 64):
         payload += cp56_now()
-    asdu = bytes((type_id, 1, 6, originator_address)) + struct.pack("<H", common_address) + ioa.to_bytes(3, "little") + payload
+    asdu = build_asdu(type_id, common_address, ioa, payload, originator_address=originator_address)
     return build_i_frame(asdu, send_sequence, receive_sequence)
+
+
+def build_parameter_asdu(common_address: int, ioa: int, type_id: int, value: float | int,
+                         qualifier: int = 0, originator_address: int = 0) -> bytes:
+    if not 0 <= qualifier <= 255:
+        raise ValueError("Parameterqualifier muss zwischen 0 und 255 liegen")
+    if type_id == 110:
+        numeric = float(value)
+        if not -1 <= numeric <= 1: raise ValueError("Normierter Parameter muss zwischen -1 und +1 liegen")
+        payload = struct.pack("<hB", max(-32768, min(32767, round(numeric * 32767))), qualifier)
+    elif type_id == 111:
+        numeric = int(value)
+        if not -32768 <= numeric <= 32767: raise ValueError("Skalierter Parameter ist außerhalb von Int16")
+        payload = struct.pack("<hB", numeric, qualifier)
+    elif type_id == 112:
+        payload = struct.pack("<fB", float(value), qualifier)
+    elif type_id == 113:
+        payload = bytes((qualifier,))
+    else:
+        raise ValueError(f"Nicht unterstützter Parametertyp {type_id}")
+    return build_asdu(type_id, common_address, ioa, payload, originator_address=originator_address)
 
 
 def hex_bytes(data: bytes) -> str:

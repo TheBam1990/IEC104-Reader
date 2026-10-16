@@ -11,20 +11,14 @@ import sys
 import tkinter as tk
 from tkinter import filedialog, messagebox, simpledialog, ttk
 
-from iec104.protocol import COT_NAMES, TYPE_NAMES, decode_asdu, hex_bytes
+from iec104.protocol import COT_NAMES, TYPE_NAMES, build_command, decode_asdu, hex_bytes
+from iec104.send_dialog import SendDialog
 from iec104.table_filter import matches_filters
 from iec104.tcp_worker import TCPWorker
 
 APP_NAME = "IEC104 Reader"
-APP_VERSION = "1.1.0"
+APP_VERSION = "1.2.0"
 CONFIG_FILE = Path.home() / "IEC104-Reader.json"
-COMMAND_TYPES = (
-    "45 - Einzelbefehl", "46 - Doppelbefehl", "48 - Sollwert normiert",
-    "49 - Sollwert skaliert", "50 - Sollwert Gleitkomma",
-    "58 - Einzelbefehl mit CP56", "59 - Doppelbefehl mit CP56",
-    "61 - Sollwert normiert mit CP56", "62 - Sollwert skaliert mit CP56",
-    "63 - Sollwert Gleitkomma mit CP56",
-)
 
 
 def application_directory() -> Path:
@@ -68,9 +62,6 @@ class ReaderApp(tk.Tk):
         self.auto_gi = tk.BooleanVar(value=True)
         self.cyclic_gi = tk.BooleanVar(value=False)
         self.gi_interval = tk.StringVar(value="60")
-        self.command_ioa = tk.StringVar()
-        self.command_type = tk.StringVar(value=COMMAND_TYPES[0])
-        self.command_value = tk.StringVar(value="0")
         self.originator_address = tk.StringVar(value="0")
         self.autoscroll = tk.BooleanVar(value=True)
         self.status = tk.StringVar(value="Bereit")
@@ -96,33 +87,20 @@ class ReaderApp(tk.Tk):
         fields = [
             ("Host / IP", self.host, 22), ("TCP-Port", self.port, 9),
             ("Common Address", self.common_address, 14), ("Timeout (s)", self.connect_timeout, 10),
-            ("GI-Intervall (s)", self.gi_interval, 12),
+            ("GI-Intervall (s)", self.gi_interval, 12), ("Originator", self.originator_address, 9),
         ]
         for column, (label, variable, width) in enumerate(fields):
             ttk.Label(top, text=label).grid(row=0, column=column, sticky=tk.W, padx=3)
             ttk.Entry(top, textvariable=variable, width=width).grid(row=1, column=column, sticky=tk.EW, padx=3, pady=2)
         self.connect_button = ttk.Button(top, text="Verbinden", command=self.toggle_connection)
-        self.connect_button.grid(row=1, column=5, padx=4)
-        ttk.Button(top, text="STARTDT", command=self.send_start).grid(row=1, column=6, padx=4)
-        ttk.Button(top, text="Generalabfrage", command=self.send_gi).grid(row=1, column=7, padx=4)
+        self.connect_button.grid(row=1, column=6, padx=4)
+        ttk.Button(top, text="STARTDT", command=self.send_start).grid(row=1, column=7, padx=4)
+        ttk.Button(top, text="Generalabfrage", command=self.send_gi).grid(row=1, column=8, padx=4)
         ttk.Checkbutton(top, text="GI nach Verbindung", variable=self.auto_gi).grid(row=2, column=0, sticky=tk.W, padx=3)
         ttk.Checkbutton(top, text="GI zyklisch", variable=self.cyclic_gi, command=self.configure_cyclic_gi).grid(row=2, column=1, sticky=tk.W, padx=3)
         ttk.Checkbutton(top, text="Traffic automatisch scrollen", variable=self.autoscroll).grid(row=2, column=2, sticky=tk.W, padx=3)
-        ttk.Button(top, text="Einstellungen speichern", command=self.save_settings).grid(row=2, column=5, padx=4, pady=3)
-
-        commands = ttk.LabelFrame(self, text="Befehl senden – nur nach bewusster Bestätigung", padding=8)
-        commands.pack(fill=tk.X, padx=8, pady=4)
-        ttk.Label(commands, text="IOA").grid(row=0, column=0, sticky=tk.W, padx=3)
-        ttk.Label(commands, text="Befehlstyp").grid(row=0, column=1, sticky=tk.W, padx=3)
-        ttk.Label(commands, text="Wert").grid(row=0, column=2, sticky=tk.W, padx=3)
-        ttk.Label(commands, text="Originator").grid(row=0, column=3, sticky=tk.W, padx=3)
-        ttk.Entry(commands, textvariable=self.command_ioa, width=18).grid(row=1, column=0, sticky=tk.EW, padx=3)
-        ttk.Combobox(commands, textvariable=self.command_type, values=COMMAND_TYPES, state="readonly", width=31).grid(row=1, column=1, sticky=tk.EW, padx=3)
-        ttk.Entry(commands, textvariable=self.command_value, width=18).grid(row=1, column=2, sticky=tk.EW, padx=3)
-        ttk.Entry(commands, textvariable=self.originator_address, width=10).grid(row=1, column=3, sticky=tk.EW, padx=3)
-        ttk.Button(commands, text="Auswahl senden", command=lambda: self.send_selected_command(True)).grid(row=1, column=4, padx=6)
-        ttk.Button(commands, text="Befehl ausführen", command=lambda: self.send_selected_command(False)).grid(row=1, column=5, padx=6)
-        ttk.Label(commands, text="Einzel: 0/1 · Doppel: 1=AUS, 2=EIN · normiert: −1…+1", foreground="#8b0000").grid(row=2, column=0, columnspan=6, sticky=tk.W, padx=3, pady=(4, 0))
+        ttk.Button(top, text="Einstellungen speichern", command=self.save_settings).grid(row=2, column=6, padx=4, pady=3)
+        ttk.Button(top, text="Senden ...", command=self.open_send_dialog).grid(row=2, column=7, padx=4, pady=3)
 
         toolbar = ttk.Frame(self, padding=(8, 3))
         toolbar.pack(fill=tk.X)
@@ -230,28 +208,53 @@ class ReaderApp(tk.Tk):
         except Exception as error:
             messagebox.showerror(APP_NAME, str(error), parent=self)
 
-    def send_selected_command(self, select: bool) -> None:
+    def originator_value(self) -> int:
+        value = int(self.originator_address.get())
+        if not 0 <= value <= 255:
+            raise ValueError("Originator muss zwischen 0 und 255 liegen")
+        return value
+
+    def open_send_dialog(self) -> None:
+        SendDialog(self, lambda: self.connection_values()[2], self.originator_value,
+                   self.send_dialog_command, self.send_dialog_asdu)
+
+    def send_dialog_command(self, type_id: int, ioa: int, value, select: bool, description: str):
         try:
             _host, _port, common_address, _timeout = self.connection_values()
-            ioa = int(self.command_ioa.get())
-            type_id = int(self.command_type.get().split("-", 1)[0].strip())
-            originator = int(self.originator_address.get())
-            value_text = self.command_value.get().strip().replace(",", ".")
-            value = float(value_text) if type_id in (48, 50, 61, 63) else int(value_text)
+            originator = self.originator_value()
+            preview_frame = build_command(common_address, ioa, type_id, value, select,
+                                          self.worker.send_sequence, self.worker.receive_sequence, originator)
             action = "AUSWAHL" if select else "AUSFÜHRUNG"
             question = (
-                f"IEC104-{action} wirklich senden?\n\n"
+                f"{description} – IEC104-{action} wirklich senden?\n\n"
                 f"Common Address: {common_address}\nIOA: {ioa}\n"
                 f"Typ: {type_id} – {TYPE_NAMES.get(type_id, '')}\nWert: {value}\n"
                 f"Originator: {originator}\n\n"
                 "Der Befehl kann eine reale Anlage beeinflussen."
             )
             if not messagebox.askyesno(APP_NAME, question, icon="warning", default="no", parent=self):
-                return
+                return None
             self.worker.send_command(common_address, ioa, type_id, value, select, originator)
             self.status.set(f"Befehl {action} gesendet: CA {common_address}, IOA {ioa}, Typ {type_id}, Wert {value}")
+            return preview_frame[6:]
         except Exception as error:
             messagebox.showerror(APP_NAME, str(error), parent=self)
+            return None
+
+    def send_dialog_asdu(self, asdu: bytes, description: str, dangerous: bool) -> bool:
+        try:
+            if dangerous and not messagebox.askyesno(
+                APP_NAME,
+                f"{description} wirklich senden?\n\n{hex_bytes(asdu)}\n\nDie ASDU kann die reale Anlage oder Geräteparameter beeinflussen.",
+                icon="warning", default="no", parent=self,
+            ):
+                return False
+            self.worker.send_asdu(asdu)
+            self.status.set(f"Gesendet: {description}")
+            return True
+        except Exception as error:
+            messagebox.showerror(APP_NAME, str(error), parent=self)
+            return False
 
     def configure_cyclic_gi(self) -> None:
         self.stop_cyclic_gi()
@@ -428,7 +431,7 @@ class ReaderApp(tk.Tk):
             "host": self.host, "port": self.port, "common_address": self.common_address,
             "connect_timeout": self.connect_timeout, "auto_gi": self.auto_gi,
             "cyclic_gi": self.cyclic_gi, "gi_interval": self.gi_interval,
-            "command_type": self.command_type, "originator_address": self.originator_address,
+            "originator_address": self.originator_address,
         }.items()}
         result["scaling_factors"] = self.scaling_factors
         return result
@@ -447,7 +450,7 @@ class ReaderApp(tk.Tk):
             variables = {"host": self.host, "port": self.port, "common_address": self.common_address,
                          "connect_timeout": self.connect_timeout, "auto_gi": self.auto_gi,
                          "cyclic_gi": self.cyclic_gi, "gi_interval": self.gi_interval}
-            variables.update({"command_type": self.command_type, "originator_address": self.originator_address})
+            variables.update({"originator_address": self.originator_address})
             for key, variable in variables.items():
                 if key in values: variable.set(values[key])
             factors = values.get("scaling_factors", {})
