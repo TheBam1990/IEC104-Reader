@@ -3,6 +3,10 @@
 Portable grafische Anwendung zum Lesen, Analysieren und kontrollierten Senden von IEC 60870-5-104 über TCP/IP.
 https://github.com/TheBam1990/IEC104-Reader/releases/tag/v1.2.0
 
+## Oberfläche
+
+![IEC104 Reader 1.3.0 mit strukturierter IOA und Qualitätskennzeichen](docs/iec104-reader-1.3.0.png)
+
 ## Funktionen
 
 - einzelne portable `IEC104-Reader.exe` ohne Installation
