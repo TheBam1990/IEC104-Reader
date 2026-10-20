@@ -1,7 +1,7 @@
 # IEC104 Reader für Windows
 
 Portable grafische Anwendung zum Lesen, Analysieren und kontrollierten Senden von IEC 60870-5-104 über TCP/IP.
-https://github.com/TheBam1990/IEC104-Reader/releases/tag/v1.2.0
+https://github.com/TheBam1990/IEC104-Reader/releases/tag/v1.3.0
 
 ## Oberfläche
 
@@ -18,10 +18,9 @@ https://github.com/TheBam1990/IEC104-Reader/releases/tag/v1.2.0
 - automatische Antwort auf TESTFR
 - vollständige RX-/TX-Anzeige in Hexadezimaldarstellung
 - Sitzungslog `IEC104-Telegrammverkehr.txt` neben der EXE; wird bei jedem Start neu begonnen
-- Wertetabelle mit CA, IOA, ASDU-Typ, Übertragungsursache, Empfangswert, Qualität und Zeitstempel
+- Wertetabelle mit getrennten Spalten für CA/ASDU und IOA sowie ASDU-Typ, Übertragungsursache, Empfangswert, Qualität und Zeitstempel
 - umschaltbare IOA-Darstellung: unstrukturiert dezimal oder strukturiert als Oktett 1.2.3
 - Qualitätskennzeichen einzeln sichtbar und filterbar: OV, BL, SB, NT und IV sowie rohes QDS-Byte
-- Faktor pro Zahlenwert; Originalwert und berechneter Wert bleiben gleichzeitig sichtbar
 - eigenes Live-Filterfeld über jeder Tabellenspalte; mehrere Filter wirken gemeinsam
 - CSV-Export der aktuell sichtbaren Tabellenzeilen
 - platzsparende Sendezentrale in einem eigenen Dialogfenster

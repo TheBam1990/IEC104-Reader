@@ -9,7 +9,7 @@ from pathlib import Path
 import queue
 import sys
 import tkinter as tk
-from tkinter import filedialog, messagebox, simpledialog, ttk
+from tkinter import filedialog, messagebox, ttk
 
 from iec104.protocol import COT_NAMES, TYPE_NAMES, build_command, decode_asdu, format_ioa, hex_bytes
 from iec104.send_dialog import SendDialog
@@ -37,9 +37,7 @@ class ReaderApp(tk.Tk):
         self.events: queue.Queue = queue.Queue()
         self.worker = TCPWorker(self.events)
         self.rows: dict[str, str] = {}
-        self.row_keys: dict[str, str] = {}
         self.latest_values = {}
-        self.scaling_factors: dict[str, float] = {}
         self.column_filters: dict[str, tk.StringVar] = {}
         self.rx_bytes = 0
         self.tx_bytes = 0
@@ -108,7 +106,6 @@ class ReaderApp(tk.Tk):
         ttk.Button(toolbar, text="Traffic leeren", command=self.clear_traffic).pack(side=tk.RIGHT, padx=3)
         ttk.Button(toolbar, text="Wertetabelle leeren", command=self.clear_values).pack(side=tk.RIGHT, padx=3)
         ttk.Button(toolbar, text="CSV exportieren", command=self.export_csv).pack(side=tk.RIGHT, padx=3)
-        ttk.Button(toolbar, text="Faktor für Wert setzen", command=self.set_selected_factor).pack(side=tk.RIGHT, padx=3)
         ttk.Button(toolbar, text="Alle Filter löschen", command=self.clear_table_filters).pack(side=tk.RIGHT, padx=3)
         ttk.Label(toolbar, text="IOA-Anzeige:").pack(side=tk.LEFT, padx=(0, 4))
         self.ioa_selector = ttk.Combobox(
@@ -137,16 +134,16 @@ class ReaderApp(tk.Tk):
         for tag, color in {"rx": "#7CFC9A", "tx": "#79B8FF", "error": "#FF7B72", "meta": "#C9D1D9"}.items():
             self.traffic.tag_configure(tag, foreground=color)
 
-        columns = ("address", "type", "cot", "received", "factor", "calculated", "quality", "qraw",
+        columns = ("common_address", "ioa", "type", "cot", "received", "quality", "qraw",
                    "ov", "bl", "sb", "nt", "iv", "unit", "timestamp", "count")
         headings = {
-            "address": "CA / IOA", "type": "ASDU-Typ", "cot": "Übertragungsursache",
-            "received": "Empfangen", "factor": "Faktor", "calculated": "Berechnet",
+            "common_address": "CA/ASDU", "ioa": "IOA", "type": "ASDU-Typ", "cot": "Übertragungsursache",
+            "received": "Empfangen",
             "quality": "Qualität", "qraw": "QDS Hex", "ov": "OV", "bl": "BL", "sb": "SB",
             "nt": "NT", "iv": "IV", "unit": "Einheit", "timestamp": "Zeitstempel", "count": "Anzahl",
         }
-        widths = {"address": 180, "type": 205, "cot": 150, "received": 120, "factor": 80,
-                  "calculated": 125, "quality": 100, "qraw": 70, "ov": 45, "bl": 45,
+        widths = {"common_address": 90, "ioa": 125, "type": 205, "cot": 150, "received": 120,
+                  "quality": 100, "qraw": 70, "ov": 45, "bl": 45,
                   "sb": 45, "nt": 45, "iv": 45, "unit": 75, "timestamp": 170, "count": 65}
         self.table = ttk.Treeview(values_frame, columns=columns, show="headings")
         for name in columns:
@@ -163,7 +160,6 @@ class ReaderApp(tk.Tk):
             x += widths[name]
             variable.trace_add("write", lambda *_args: self.apply_table_filter())
         self.filter_canvas.configure(scrollregion=(0, 0, x, 27))
-        self.table.bind("<Double-1>", self.set_selected_factor)
         table_y = ttk.Scrollbar(values_frame, orient=tk.VERTICAL, command=self.table.yview)
         table_x = ttk.Scrollbar(values_frame, orient=tk.HORIZONTAL, command=self.scroll_value_table)
         self.table.configure(yscrollcommand=table_y.set, xscrollcommand=lambda first, last: self.sync_table_scroll(table_x, first, last))
@@ -338,15 +334,10 @@ class ReaderApp(tk.Tk):
 
     def update_value(self, value, timestamp: str, increment: bool = True) -> None:
         rendered = str(value.value)
-        numeric = isinstance(value.value, (int, float)) and not isinstance(value.value, bool)
-        factor = self.scaling_factors.get(value.key, 1.0) if numeric else None
-        calculated = self.format_number(float(value.value) * factor) if numeric else rendered
-        factor_text = self.format_number(factor) if numeric else ""
         quality_raw = value.quality_raw
-        address = f"CA {value.common_address} / IOA {format_ioa(value.ioa, self.ioa_is_structured())}"
         flag = lambda mask: "ja" if quality_raw & mask else "-"
-        row = (address, f"{value.type_id}: {value.type_name}",
-               f"{value.cause}: {value.cause_name}", rendered, factor_text, calculated,
+        row = (str(value.common_address), format_ioa(value.ioa, self.ioa_is_structured()),
+               f"{value.type_id}: {value.type_name}", f"{value.cause}: {value.cause_name}", rendered,
                value.quality, f"0x{quality_raw:02X}", flag(0x01), flag(0x10), flag(0x20),
                flag(0x40), flag(0x80), value.unit, timestamp, 1)
         current = self.rows.get(value.key)
@@ -358,7 +349,6 @@ class ReaderApp(tk.Tk):
         else:
             current = self.table.insert("", 0, values=row)
             self.rows[value.key] = current
-            self.row_keys[current] = value.key
         self.latest_values[value.key] = (value, timestamp)
         self.apply_table_filter()
 
@@ -371,27 +361,6 @@ class ReaderApp(tk.Tk):
         self.save_settings(silent=True)
         mode = "strukturiert" if self.ioa_is_structured() else "unstrukturiert"
         self.status.set(f"IOA-Anzeige: {mode}")
-
-    @staticmethod
-    def format_number(value: float) -> str:
-        return f"{value:.12g}"
-
-    def set_selected_factor(self, _event=None) -> None:
-        selected = self.table.selection()
-        if not selected:
-            messagebox.showinfo(APP_NAME, "Bitte zuerst einen Zahlenwert auswählen.", parent=self)
-            return
-        key = self.row_keys.get(selected[0], "")
-        latest = self.latest_values.get(key)
-        if not latest or not isinstance(latest[0].value, (int, float)) or isinstance(latest[0].value, bool):
-            messagebox.showinfo(APP_NAME, "Für diesen Wert kann kein Zahlenfaktor gesetzt werden.", parent=self)
-            return
-        factor = simpledialog.askfloat(APP_NAME, f"Faktor für {key}:\n\nBerechnet = Empfangen × Faktor",
-                                       initialvalue=self.scaling_factors.get(key, 1.0), parent=self)
-        if factor is None: return
-        self.scaling_factors[key] = factor
-        self.update_value(latest[0], latest[1], increment=False)
-        self.save_settings(silent=True)
 
     def apply_table_filter(self) -> None:
         columns = tuple(self.table["columns"])
@@ -434,7 +403,7 @@ class ReaderApp(tk.Tk):
 
     def clear_values(self) -> None:
         for item in tuple(self.rows.values()): self.table.delete(item)
-        self.rows.clear(); self.row_keys.clear(); self.latest_values.clear()
+        self.rows.clear(); self.latest_values.clear()
 
     def sort_table(self, column: str, reverse: bool) -> None:
         rows = [(self.table.set(item, column).casefold(), item) for item in self.table.get_children("")]
@@ -459,7 +428,6 @@ class ReaderApp(tk.Tk):
             "originator_address": self.originator_address,
             "ioa_display": self.ioa_display,
         }.items()}
-        result["scaling_factors"] = self.scaling_factors
         return result
 
     def save_settings(self, silent: bool = False) -> None:
@@ -479,9 +447,6 @@ class ReaderApp(tk.Tk):
             variables.update({"originator_address": self.originator_address, "ioa_display": self.ioa_display})
             for key, variable in variables.items():
                 if key in values: variable.set(values[key])
-            factors = values.get("scaling_factors", {})
-            if isinstance(factors, dict):
-                self.scaling_factors = {str(k): float(v) for k, v in factors.items() if isinstance(v, (int, float))}
         except (OSError, ValueError) as error:
             if not silent: messagebox.showerror(APP_NAME, str(error), parent=self)
 
