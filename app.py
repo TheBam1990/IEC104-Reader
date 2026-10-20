@@ -11,13 +11,13 @@ import sys
 import tkinter as tk
 from tkinter import filedialog, messagebox, simpledialog, ttk
 
-from iec104.protocol import COT_NAMES, TYPE_NAMES, build_command, decode_asdu, hex_bytes
+from iec104.protocol import COT_NAMES, TYPE_NAMES, build_command, decode_asdu, format_ioa, hex_bytes
 from iec104.send_dialog import SendDialog
 from iec104.table_filter import matches_filters
 from iec104.tcp_worker import TCPWorker
 
 APP_NAME = "IEC104 Reader"
-APP_VERSION = "1.2.0"
+APP_VERSION = "1.3.0"
 CONFIG_FILE = Path.home() / "IEC104-Reader.json"
 
 
@@ -63,6 +63,7 @@ class ReaderApp(tk.Tk):
         self.cyclic_gi = tk.BooleanVar(value=False)
         self.gi_interval = tk.StringVar(value="60")
         self.originator_address = tk.StringVar(value="0")
+        self.ioa_display = tk.StringVar(value="Unstrukturiert (dezimal)")
         self.autoscroll = tk.BooleanVar(value=True)
         self.status = tk.StringVar(value="Bereit")
         self.counter = tk.StringVar(value="RX 0 B | TX 0 B | 0 Werte")
@@ -109,6 +110,13 @@ class ReaderApp(tk.Tk):
         ttk.Button(toolbar, text="CSV exportieren", command=self.export_csv).pack(side=tk.RIGHT, padx=3)
         ttk.Button(toolbar, text="Faktor für Wert setzen", command=self.set_selected_factor).pack(side=tk.RIGHT, padx=3)
         ttk.Button(toolbar, text="Alle Filter löschen", command=self.clear_table_filters).pack(side=tk.RIGHT, padx=3)
+        ttk.Label(toolbar, text="IOA-Anzeige:").pack(side=tk.LEFT, padx=(0, 4))
+        self.ioa_selector = ttk.Combobox(
+            toolbar, textvariable=self.ioa_display, state="readonly", width=30,
+            values=("Unstrukturiert (dezimal)", "Strukturiert (Oktett 1.2.3)"),
+        )
+        self.ioa_selector.pack(side=tk.LEFT, padx=3)
+        self.ioa_selector.bind("<<ComboboxSelected>>", self.change_ioa_display)
 
         split = ttk.Panedwindow(self, orient=tk.HORIZONTAL)
         split.pack(fill=tk.BOTH, expand=True, padx=8, pady=4)
@@ -129,14 +137,17 @@ class ReaderApp(tk.Tk):
         for tag, color in {"rx": "#7CFC9A", "tx": "#79B8FF", "error": "#FF7B72", "meta": "#C9D1D9"}.items():
             self.traffic.tag_configure(tag, foreground=color)
 
-        columns = ("address", "type", "cot", "received", "factor", "calculated", "quality", "unit", "timestamp", "count")
+        columns = ("address", "type", "cot", "received", "factor", "calculated", "quality", "qraw",
+                   "ov", "bl", "sb", "nt", "iv", "unit", "timestamp", "count")
         headings = {
             "address": "CA / IOA", "type": "ASDU-Typ", "cot": "Übertragungsursache",
             "received": "Empfangen", "factor": "Faktor", "calculated": "Berechnet",
-            "quality": "Qualität", "unit": "Einheit", "timestamp": "Zeitstempel", "count": "Anzahl",
+            "quality": "Qualität", "qraw": "QDS Hex", "ov": "OV", "bl": "BL", "sb": "SB",
+            "nt": "NT", "iv": "IV", "unit": "Einheit", "timestamp": "Zeitstempel", "count": "Anzahl",
         }
         widths = {"address": 180, "type": 205, "cot": 150, "received": 120, "factor": 80,
-                  "calculated": 125, "quality": 100, "unit": 75, "timestamp": 170, "count": 65}
+                  "calculated": 125, "quality": 100, "qraw": 70, "ov": 45, "bl": 45,
+                  "sb": 45, "nt": 45, "iv": 45, "unit": 75, "timestamp": 170, "count": 65}
         self.table = ttk.Treeview(values_frame, columns=columns, show="headings")
         for name in columns:
             self.table.heading(name, text=headings[name], command=lambda n=name: self.sort_table(n, False))
@@ -331,13 +342,17 @@ class ReaderApp(tk.Tk):
         factor = self.scaling_factors.get(value.key, 1.0) if numeric else None
         calculated = self.format_number(float(value.value) * factor) if numeric else rendered
         factor_text = self.format_number(factor) if numeric else ""
-        row = (f"CA {value.common_address} / IOA {value.ioa}", f"{value.type_id}: {value.type_name}",
+        quality_raw = value.quality_raw
+        address = f"CA {value.common_address} / IOA {format_ioa(value.ioa, self.ioa_is_structured())}"
+        flag = lambda mask: "ja" if quality_raw & mask else "-"
+        row = (address, f"{value.type_id}: {value.type_name}",
                f"{value.cause}: {value.cause_name}", rendered, factor_text, calculated,
-               value.quality, value.unit, timestamp, 1)
+               value.quality, f"0x{quality_raw:02X}", flag(0x01), flag(0x10), flag(0x20),
+               flag(0x40), flag(0x80), value.unit, timestamp, 1)
         current = self.rows.get(value.key)
         if current:
             old = self.table.item(current, "values")
-            row = row[:-1] + (int(old[9]) + (1 if increment else 0),)
+            row = row[:-1] + (int(old[-1]) + (1 if increment else 0),)
             self.table.item(current, values=row)
             self.table.move(current, "", 0)
         else:
@@ -346,6 +361,16 @@ class ReaderApp(tk.Tk):
             self.row_keys[current] = value.key
         self.latest_values[value.key] = (value, timestamp)
         self.apply_table_filter()
+
+    def ioa_is_structured(self) -> bool:
+        return self.ioa_display.get().startswith("Strukturiert")
+
+    def change_ioa_display(self, _event=None) -> None:
+        for value, timestamp in self.latest_values.values():
+            self.update_value(value, timestamp, increment=False)
+        self.save_settings(silent=True)
+        mode = "strukturiert" if self.ioa_is_structured() else "unstrukturiert"
+        self.status.set(f"IOA-Anzeige: {mode}")
 
     @staticmethod
     def format_number(value: float) -> str:
@@ -432,6 +457,7 @@ class ReaderApp(tk.Tk):
             "connect_timeout": self.connect_timeout, "auto_gi": self.auto_gi,
             "cyclic_gi": self.cyclic_gi, "gi_interval": self.gi_interval,
             "originator_address": self.originator_address,
+            "ioa_display": self.ioa_display,
         }.items()}
         result["scaling_factors"] = self.scaling_factors
         return result
@@ -450,7 +476,7 @@ class ReaderApp(tk.Tk):
             variables = {"host": self.host, "port": self.port, "common_address": self.common_address,
                          "connect_timeout": self.connect_timeout, "auto_gi": self.auto_gi,
                          "cyclic_gi": self.cyclic_gi, "gi_interval": self.gi_interval}
-            variables.update({"originator_address": self.originator_address})
+            variables.update({"originator_address": self.originator_address, "ioa_display": self.ioa_display})
             for key, variable in variables.items():
                 if key in values: variable.set(values[key])
             factors = values.get("scaling_factors", {})

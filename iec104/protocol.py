@@ -77,6 +77,7 @@ class Value:
     cause_name: str
     value: object
     quality: str
+    quality_raw: int = 0
     unit: str = ""
     source_timestamp: str = ""
 
@@ -290,6 +291,15 @@ def quality_text(qds: int) -> str:
     return ",".join(flags) if flags else "good"
 
 
+def format_ioa(ioa: int, structured: bool = False) -> str:
+    """Render a 24-bit IOA as decimal or as its three transmitted octets."""
+    if not 0 <= ioa <= 0xFFFFFF:
+        raise ValueError("IOA muss zwischen 0 und 16777215 liegen")
+    if not structured:
+        return str(ioa)
+    return ".".join(str((ioa >> shift) & 0xFF) for shift in (0, 8, 16))
+
+
 def cp56_text(data: bytes) -> str:
     if len(data) < 7:
         return ""
@@ -303,7 +313,7 @@ def cp56_text(data: bytes) -> str:
         return "ungültiger Zeitstempel"
 
 
-def decode_value(kind: str, payload: bytes) -> tuple[object, str, str]:
+def decode_value(kind: str, payload: bytes) -> tuple[object, str, str, int]:
     timestamp = ""
     if kind.endswith("_cp56"):
         timestamp = cp56_text(payload[-7:])
@@ -311,26 +321,29 @@ def decode_value(kind: str, payload: bytes) -> tuple[object, str, str]:
     elif kind.endswith("_cp24"):
         payload = payload[:-3]
     if kind.startswith("sp"):
-        return bool(payload[0] & 1), quality_text(payload[0] & 0xF0), timestamp
+        quality_raw = payload[0] & 0xF0
+        return bool(payload[0] & 1), quality_text(quality_raw), timestamp, quality_raw
     if kind.startswith("dp"):
-        return payload[0] & 3, quality_text(payload[0] & 0xF0), timestamp
+        quality_raw = payload[0] & 0xF0
+        return payload[0] & 3, quality_text(quality_raw), timestamp, quality_raw
     if kind.startswith("step"):
         raw = payload[0] & 0x7F
         value = raw - 128 if raw & 0x40 else raw
-        return value, quality_text(payload[1]), timestamp
+        return value, quality_text(payload[1]), timestamp, payload[1]
     if kind.startswith("bits") or kind == "status":
-        return f"0x{int.from_bytes(payload[:4], 'little'):08X}", quality_text(payload[4]), timestamp
+        return f"0x{int.from_bytes(payload[:4], 'little'):08X}", quality_text(payload[4]), timestamp, payload[4]
     if kind.startswith("norm"):
         raw = int.from_bytes(payload[:2], "little", signed=True)
         quality = "good" if kind == "norm_noq" else quality_text(payload[2])
-        return raw / 32768.0, quality, timestamp
+        quality_raw = 0 if kind == "norm_noq" else payload[2]
+        return raw / 32768.0, quality, timestamp, quality_raw
     if kind.startswith("scaled"):
-        return int.from_bytes(payload[:2], "little", signed=True), quality_text(payload[2]), timestamp
+        return int.from_bytes(payload[:2], "little", signed=True), quality_text(payload[2]), timestamp, payload[2]
     if kind.startswith("float"):
-        return struct.unpack("<f", payload[:4])[0], quality_text(payload[4]), timestamp
+        return struct.unpack("<f", payload[:4])[0], quality_text(payload[4]), timestamp, payload[4]
     if kind.startswith("counter"):
-        return int.from_bytes(payload[:4], "little", signed=True), quality_text(payload[4]), timestamp
-    return hex_bytes(payload), "unbekannt", timestamp
+        return int.from_bytes(payload[:4], "little", signed=True), quality_text(payload[4]), timestamp, payload[4]
+    return hex_bytes(payload), "unbekannt", timestamp, 0
 
 
 def decode_asdu(data: bytes) -> list[Value]:
@@ -355,12 +368,12 @@ def decode_asdu(data: bytes) -> list[Value]:
         else:
             ioa = first_ioa + index
         if offset + size > len(data): raise ValueError("Informationsobjekt unvollständig")
-        value, quality, source_timestamp = decode_value(kind, data[offset:offset + size])
+        value, quality, source_timestamp, quality_raw = decode_value(kind, data[offset:offset + size])
         offset += size
         values.append(Value(
             key=f"CA{common_address}:IOA{ioa}:T{type_id}", common_address=common_address,
             ioa=ioa, type_id=type_id, type_name=TYPE_NAMES.get(type_id, f"Typ {type_id}"),
             cause=cause, cause_name=COT_NAMES.get(cause, f"COT {cause}"), value=value,
-            quality=quality, source_timestamp=source_timestamp,
+            quality=quality, quality_raw=quality_raw, source_timestamp=source_timestamp,
         ))
     return values

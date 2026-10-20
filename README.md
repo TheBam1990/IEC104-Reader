@@ -15,6 +15,8 @@ https://github.com/TheBam1990/IEC104-Reader/releases/tag/v1.2.0
 - vollständige RX-/TX-Anzeige in Hexadezimaldarstellung
 - Sitzungslog `IEC104-Telegrammverkehr.txt` neben der EXE; wird bei jedem Start neu begonnen
 - Wertetabelle mit CA, IOA, ASDU-Typ, Übertragungsursache, Empfangswert, Qualität und Zeitstempel
+- umschaltbare IOA-Darstellung: unstrukturiert dezimal oder strukturiert als Oktett 1.2.3
+- Qualitätskennzeichen einzeln sichtbar und filterbar: OV, BL, SB, NT und IV sowie rohes QDS-Byte
 - Faktor pro Zahlenwert; Originalwert und berechneter Wert bleiben gleichzeitig sichtbar
 - eigenes Live-Filterfeld über jeder Tabellenspalte; mehrere Filter wirken gemeinsam
 - CSV-Export der aktuell sichtbaren Tabellenzeilen

@@ -1,7 +1,7 @@
 import struct
 import unittest
 
-from iec104.protocol import APDUParser, build_asdu, build_command, build_general_interrogation, build_parameter_asdu, build_s_frame, build_standard_asdu, build_u_frame, decode_asdu, parse_hex_bytes
+from iec104.protocol import APDUParser, build_asdu, build_command, build_general_interrogation, build_parameter_asdu, build_s_frame, build_standard_asdu, build_u_frame, decode_asdu, format_ioa, parse_hex_bytes
 
 
 class ProtocolTests(unittest.TestCase):
@@ -31,6 +31,19 @@ class ProtocolTests(unittest.TestCase):
         value = decode_asdu(data)[0]
         self.assertAlmostEqual(value.value, 12.5)
         self.assertEqual(value.quality, "IV")
+        self.assertEqual(value.quality_raw, 0x80)
+
+    def test_all_quality_flags(self):
+        data = bytes((11, 1, 3, 0, 1, 0)) + (123).to_bytes(3, "little") + struct.pack("<hB", 7, 0xF1)
+        value = decode_asdu(data)[0]
+        self.assertEqual(value.quality, "OV,BL,SB,NT,IV")
+        self.assertEqual(value.quality_raw, 0xF1)
+
+    def test_structured_and_unstructured_ioa(self):
+        self.assertEqual(format_ioa(4235604), "4235604")
+        self.assertEqual(format_ioa(4235604, structured=True), "84.161.64")
+        with self.assertRaises(ValueError):
+            format_ioa(0x1000000, structured=True)
 
     def test_single_point(self):
         data = bytes((1, 1, 20, 0, 1, 0)) + (9).to_bytes(3, "little") + b"\x01"
