@@ -17,7 +17,7 @@ from iec104.table_filter import matches_filters
 from iec104.tcp_worker import TCPWorker
 
 APP_NAME = "IEC104 Reader"
-APP_VERSION = "1.3.0"
+APP_VERSION = "1.3.1"
 CONFIG_FILE = Path.home() / "IEC104-Reader.json"
 
 
@@ -110,7 +110,7 @@ class ReaderApp(tk.Tk):
         ttk.Label(toolbar, text="IOA-Anzeige:").pack(side=tk.LEFT, padx=(0, 4))
         self.ioa_selector = ttk.Combobox(
             toolbar, textvariable=self.ioa_display, state="readonly", width=30,
-            values=("Unstrukturiert (dezimal)", "Strukturiert (Oktett 1.2.3)"),
+            values=("Unstrukturiert (dezimal)", "Strukturiert (Oktett 1-2-3)"),
         )
         self.ioa_selector.pack(side=tk.LEFT, padx=3)
         self.ioa_selector.bind("<<ComboboxSelected>>", self.change_ioa_display)
@@ -447,6 +447,8 @@ class ReaderApp(tk.Tk):
             variables.update({"originator_address": self.originator_address, "ioa_display": self.ioa_display})
             for key, variable in variables.items():
                 if key in values: variable.set(values[key])
+            if self.ioa_display.get() == "Strukturiert (Oktett 1.2.3)":
+                self.ioa_display.set("Strukturiert (Oktett 1-2-3)")
         except (OSError, ValueError) as error:
             if not silent: messagebox.showerror(APP_NAME, str(error), parent=self)
 

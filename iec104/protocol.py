@@ -297,7 +297,7 @@ def format_ioa(ioa: int, structured: bool = False) -> str:
         raise ValueError("IOA muss zwischen 0 und 16777215 liegen")
     if not structured:
         return str(ioa)
-    return ".".join(str((ioa >> shift) & 0xFF) for shift in (0, 8, 16))
+    return "-".join(str((ioa >> shift) & 0xFF) for shift in (0, 8, 16))
 
 
 def cp56_text(data: bytes) -> str:

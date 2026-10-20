@@ -41,7 +41,7 @@ class ProtocolTests(unittest.TestCase):
 
     def test_structured_and_unstructured_ioa(self):
         self.assertEqual(format_ioa(4235604), "4235604")
-        self.assertEqual(format_ioa(4235604, structured=True), "84.161.64")
+        self.assertEqual(format_ioa(4235604, structured=True), "84-161-64")
         with self.assertRaises(ValueError):
             format_ioa(0x1000000, structured=True)
 
