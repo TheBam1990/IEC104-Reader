@@ -291,13 +291,18 @@ def quality_text(qds: int) -> str:
     return ",".join(flags) if flags else "good"
 
 
-def format_ioa(ioa: int, structured: bool = False) -> str:
-    """Render a 24-bit IOA as decimal or as its three transmitted octets."""
+def format_ioa(ioa: int, mode: str = "decimal") -> str:
+    """Render a 24-bit IOA as decimal, telegram octets, or Siemens A-B-C."""
     if not 0 <= ioa <= 0xFFFFFF:
         raise ValueError("IOA muss zwischen 0 und 16777215 liegen")
-    if not structured:
+    if mode == "decimal":
         return str(ioa)
-    return "-".join(str((ioa >> shift) & 0xFF) for shift in (0, 8, 16))
+    octets = tuple((ioa >> shift) & 0xFF for shift in (0, 8, 16))
+    if mode == "winpp":
+        return "-".join(str(part) for part in octets)
+    if mode == "siemens":
+        return "-".join(str(part) for part in reversed(octets))
+    raise ValueError(f"Unbekannter IOA-Anzeigemodus: {mode}")
 
 
 def cp56_text(data: bytes) -> str:

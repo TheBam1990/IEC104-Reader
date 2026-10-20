@@ -41,9 +41,12 @@ class ProtocolTests(unittest.TestCase):
 
     def test_structured_and_unstructured_ioa(self):
         self.assertEqual(format_ioa(4235604), "4235604")
-        self.assertEqual(format_ioa(4235604, structured=True), "84-161-64")
+        self.assertEqual(format_ioa(4235604, "winpp"), "84-161-64")
+        self.assertEqual(format_ioa(4235604, "siemens"), "64-161-84")
         with self.assertRaises(ValueError):
-            format_ioa(0x1000000, structured=True)
+            format_ioa(0x1000000, "siemens")
+        with self.assertRaises(ValueError):
+            format_ioa(1, "unbekannt")
 
     def test_single_point(self):
         data = bytes((1, 1, 20, 0, 1, 0)) + (9).to_bytes(3, "little") + b"\x01"

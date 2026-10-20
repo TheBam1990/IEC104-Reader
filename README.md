@@ -1,11 +1,11 @@
 # IEC104 Reader für Windows
 
 Portable grafische Anwendung zum Lesen, Analysieren und kontrollierten Senden von IEC 60870-5-104 über TCP/IP.
-https://github.com/TheBam1990/IEC104-Reader/releases/tag/v1.3.1
+https://github.com/TheBam1990/IEC104-Reader/releases/tag/v1.4.0
 
 ## Oberfläche
 
-![IEC104 Reader 1.3.1 mit strukturierter IOA und Qualitätskennzeichen](docs/iec104-reader-1.3.1.png)
+![IEC104 Reader 1.4.0 mit wählbarer strukturierter IOA und Qualitätskennzeichen](docs/iec104-reader-1.4.0.png)
 
 ## Funktionen
 
@@ -19,7 +19,9 @@ https://github.com/TheBam1990/IEC104-Reader/releases/tag/v1.3.1
 - vollständige RX-/TX-Anzeige in Hexadezimaldarstellung
 - Sitzungslog `IEC104-Telegrammverkehr.txt` neben der EXE; wird bei jedem Start neu begonnen
 - Wertetabelle mit getrennten Spalten für CA/ASDU und IOA sowie ASDU-Typ, Übertragungsursache, Empfangswert, Qualität und Zeitstempel
-- umschaltbare IOA-Darstellung: unstrukturiert dezimal oder strukturiert als Oktett 1-2-3
+- umschaltbare IOA-Darstellung: unstrukturiert dezimal, WinPP/Telegramm
+  (IOA1-IOA2-IOA3, Low Byte zuerst) oder Siemens (IOA3-IOA2-IOA1,
+  Darstellung A-B-C)
 - Qualitätskennzeichen einzeln sichtbar und filterbar: OV, BL, SB, NT und IV sowie rohes QDS-Byte
 - eigenes Live-Filterfeld über jeder Tabellenspalte; mehrere Filter wirken gemeinsam
 - CSV-Export der aktuell sichtbaren Tabellenzeilen
@@ -46,6 +48,15 @@ https://github.com/TheBam1990/IEC104-Reader/releases/tag/v1.3.1
 6. Empfangene Werte erscheinen rechts in der Tabelle.
 
 Die Filterfelder befinden sich direkt über den jeweiligen Spalten. Mehrere ausgefüllte Filter werden als UND-Verknüpfung ausgewertet. Mit **Alle Filter löschen** oder Escape werden alle Zeilen wieder eingeblendet.
+
+### Strukturierte IOA-Darstellung
+
+IEC 60870-5-104 überträgt die drei IOA-Oktette mit dem niederwertigsten Byte
+zuerst. WinPP/Telegramm zeigt sie deshalb als `IOA1-IOA2-IOA3`. Siemens
+bezeichnet die strukturierte Adresse dagegen als `A-B-C` und berechnet den
+Dezimalwert mit `A × 65536 + B × 256 + C`; dies entspricht
+`IOA3-IOA2-IOA1`. Beispiel für IOA `4235604` (`0x40A154`): WinPP/Telegramm
+`84-161-64`, Siemens `64-161-84`.
 
 ## Telegramme senden
 

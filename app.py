@@ -17,7 +17,7 @@ from iec104.table_filter import matches_filters
 from iec104.tcp_worker import TCPWorker
 
 APP_NAME = "IEC104 Reader"
-APP_VERSION = "1.3.1"
+APP_VERSION = "1.4.0"
 CONFIG_FILE = Path.home() / "IEC104-Reader.json"
 
 
@@ -109,8 +109,12 @@ class ReaderApp(tk.Tk):
         ttk.Button(toolbar, text="Alle Filter löschen", command=self.clear_table_filters).pack(side=tk.RIGHT, padx=3)
         ttk.Label(toolbar, text="IOA-Anzeige:").pack(side=tk.LEFT, padx=(0, 4))
         self.ioa_selector = ttk.Combobox(
-            toolbar, textvariable=self.ioa_display, state="readonly", width=30,
-            values=("Unstrukturiert (dezimal)", "Strukturiert (Oktett 1-2-3)"),
+            toolbar, textvariable=self.ioa_display, state="readonly", width=48,
+            values=(
+                "Unstrukturiert (dezimal)",
+                "Strukturiert WinPP/Telegramm (IOA1-IOA2-IOA3)",
+                "Strukturiert Siemens (IOA3-IOA2-IOA1)",
+            ),
         )
         self.ioa_selector.pack(side=tk.LEFT, padx=3)
         self.ioa_selector.bind("<<ComboboxSelected>>", self.change_ioa_display)
@@ -336,7 +340,7 @@ class ReaderApp(tk.Tk):
         rendered = str(value.value)
         quality_raw = value.quality_raw
         flag = lambda mask: "ja" if quality_raw & mask else "-"
-        row = (str(value.common_address), format_ioa(value.ioa, self.ioa_is_structured()),
+        row = (str(value.common_address), format_ioa(value.ioa, self.ioa_display_mode()),
                f"{value.type_id}: {value.type_name}", f"{value.cause}: {value.cause_name}", rendered,
                value.quality, f"0x{quality_raw:02X}", flag(0x01), flag(0x10), flag(0x20),
                flag(0x40), flag(0x80), value.unit, timestamp, 1)
@@ -352,15 +356,19 @@ class ReaderApp(tk.Tk):
         self.latest_values[value.key] = (value, timestamp)
         self.apply_table_filter()
 
-    def ioa_is_structured(self) -> bool:
-        return self.ioa_display.get().startswith("Strukturiert")
+    def ioa_display_mode(self) -> str:
+        selection = self.ioa_display.get()
+        if "Siemens" in selection:
+            return "siemens"
+        if selection.startswith("Strukturiert"):
+            return "winpp"
+        return "decimal"
 
     def change_ioa_display(self, _event=None) -> None:
         for value, timestamp in self.latest_values.values():
             self.update_value(value, timestamp, increment=False)
         self.save_settings(silent=True)
-        mode = "strukturiert" if self.ioa_is_structured() else "unstrukturiert"
-        self.status.set(f"IOA-Anzeige: {mode}")
+        self.status.set(f"IOA-Anzeige: {self.ioa_display.get()}")
 
     def apply_table_filter(self) -> None:
         columns = tuple(self.table["columns"])
@@ -447,8 +455,10 @@ class ReaderApp(tk.Tk):
             variables.update({"originator_address": self.originator_address, "ioa_display": self.ioa_display})
             for key, variable in variables.items():
                 if key in values: variable.set(values[key])
-            if self.ioa_display.get() == "Strukturiert (Oktett 1.2.3)":
-                self.ioa_display.set("Strukturiert (Oktett 1-2-3)")
+            if self.ioa_display.get() in {
+                "Strukturiert (Oktett 1.2.3)", "Strukturiert (Oktett 1-2-3)"
+            }:
+                self.ioa_display.set("Strukturiert WinPP/Telegramm (IOA1-IOA2-IOA3)")
         except (OSError, ValueError) as error:
             if not silent: messagebox.showerror(APP_NAME, str(error), parent=self)
 
