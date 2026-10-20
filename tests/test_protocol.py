@@ -1,7 +1,7 @@
 import struct
 import unittest
 
-from iec104.protocol import APDUParser, build_asdu, build_command, build_general_interrogation, build_parameter_asdu, build_s_frame, build_standard_asdu, build_u_frame, decode_asdu, format_ioa, parse_hex_bytes
+from iec104.protocol import APDUParser, build_asdu, build_command, build_general_interrogation, build_parameter_asdu, build_s_frame, build_standard_asdu, build_u_frame, decode_asdu, format_ioa, parse_hex_bytes, parse_ioa
 
 
 class ProtocolTests(unittest.TestCase):
@@ -47,6 +47,11 @@ class ProtocolTests(unittest.TestCase):
             format_ioa(0x1000000, "siemens")
         with self.assertRaises(ValueError):
             format_ioa(1, "unbekannt")
+        self.assertEqual(parse_ioa("4235604"), 4235604)
+        self.assertEqual(parse_ioa("84-161-64", "winpp"), 4235604)
+        self.assertEqual(parse_ioa("64-161-84", "siemens"), 4235604)
+        with self.assertRaises(ValueError):
+            parse_ioa("64-300-84", "siemens")
 
     def test_single_point(self):
         data = bytes((1, 1, 20, 0, 1, 0)) + (9).to_bytes(3, "little") + b"\x01"

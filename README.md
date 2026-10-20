@@ -36,6 +36,7 @@ https://github.com/TheBam1990/IEC104-Reader/releases/tag/v1.4.0
 - frei konfigurierbare ASDUs und Vorlagen für die IEC104-Dateitypen 120–126
 - ASDU-Vorschau in Hexadezimaldarstellung
 - Sicherheitsrückfrage vor jedem einzelnen Befehl
+- IOA beim Senden wahlweise dezimal oder passend zum gewählten Siemens-/WinPP-Modus strukturiert eingebbar
 - lokale Speicherung der Verbindungseinstellungen und Faktoren
 
 ## Bedienung

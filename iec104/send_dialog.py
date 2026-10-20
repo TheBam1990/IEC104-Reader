@@ -36,7 +36,8 @@ class SendDialog(tk.Toplevel):
 
     def __init__(self, parent: tk.Misc, common_address: Callable[[], int],
                  originator: Callable[[], int], send_command: Callable,
-                 send_asdu: Callable[[bytes, str, bool], bool]) -> None:
+                 send_asdu: Callable[[bytes, str, bool], bool],
+                 parse_ioa: Callable[[str], int], ioa_mode: Callable[[], str]) -> None:
         super().__init__(parent)
         self.title("IEC104 senden")
         self.geometry("790x530")
@@ -46,11 +47,18 @@ class SendDialog(tk.Toplevel):
         self.originator = originator
         self.send_command_callback = send_command
         self.send_asdu_callback = send_asdu
+        self.parse_ioa = parse_ioa
+        self.ioa_mode = ioa_mode
         self.preview = tk.StringVar(value="Die ASDU-Vorschau erscheint vor dem Senden.")
         self._build()
 
     def _build(self) -> None:
-        ttk.Label(self, text="Common Address und Originator werden aus dem Hauptfenster übernommen.").pack(fill=tk.X, padx=10, pady=(10, 4))
+        ttk.Label(self, text="Common Address und Originator werden aus dem Hauptfenster übernommen.").pack(fill=tk.X, padx=10, pady=(10, 2))
+        ttk.Label(
+            self,
+            text=f"IOA-Eingabe: dezimal oder passend zur Hauptanzeige strukturiert – {self.ioa_mode()}",
+            foreground="#555555",
+        ).pack(fill=tk.X, padx=10, pady=(0, 4))
         book = ttk.Notebook(self)
         book.pack(fill=tk.BOTH, expand=True, padx=10, pady=4)
         self._standard_tab(book)
@@ -165,14 +173,14 @@ class SendDialog(tk.Toplevel):
 
     def _send_standard(self, type_id: int, label: str, dangerous: bool) -> None:
         try:
-            ioa = self._number(self.std_ioa, "IOA")
+            ioa = self.parse_ioa(self.std_ioa.get())
             qualifier = self._number(self.std_qualifier, "Qualifier", 65535 if type_id == 106 else 255)
             self._show_asdu(build_standard_asdu(type_id, self.common_address(), ioa, qualifier, self.originator()), label, dangerous)
         except ValueError as error: messagebox.showerror("IEC104 senden", str(error), parent=self)
 
     def _command_values(self, type_var, ioa_var, value_var):
         type_id = int(type_var.get().split("-", 1)[0].strip())
-        ioa = self._number(ioa_var, "IOA")
+        ioa = self.parse_ioa(ioa_var.get())
         text = value_var.get().strip().replace(",", ".")
         value = float(text) if type_id in (48, 50, 61, 63) else int(text, 0)
         return type_id, ioa, value
@@ -194,7 +202,7 @@ class SendDialog(tk.Toplevel):
     def _send_parameter(self) -> None:
         try:
             type_id = int(self.parameter_type.get().split("-", 1)[0].strip())
-            ioa = self._number(self.parameter_ioa, "IOA")
+            ioa = self.parse_ioa(self.parameter_ioa.get())
             qualifier = self._number(self.parameter_qpa, "QPM/QPA", 255)
             value = float(self.parameter_value.get().replace(",", ".")) if type_id in (110, 112) else int(self.parameter_value.get(), 0)
             self._show_asdu(build_parameter_asdu(self.common_address(), ioa, type_id, value, qualifier, self.originator()), "Parameter senden", True)
@@ -206,6 +214,6 @@ class SendDialog(tk.Toplevel):
 
     def _send_raw(self) -> None:
         try:
-            asdu = build_asdu(self._number(self.raw_type, "Typ", 255), self.common_address(), self._number(self.raw_ioa, "IOA"), parse_hex_bytes(self.raw_payload.get()), self._number(self.raw_cot, "COT", 255), self.originator(), self._number(self.raw_vsq, "VSQ", 255))
+            asdu = build_asdu(self._number(self.raw_type, "Typ", 255), self.common_address(), self.parse_ioa(self.raw_ioa.get()), parse_hex_bytes(self.raw_payload.get()), self._number(self.raw_cot, "COT", 255), self.originator(), self._number(self.raw_vsq, "VSQ", 255))
             self._show_asdu(asdu, self.raw_preset.get(), True)
         except ValueError as error: messagebox.showerror("IEC104 senden", str(error), parent=self)

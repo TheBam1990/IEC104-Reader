@@ -305,6 +305,33 @@ def format_ioa(ioa: int, mode: str = "decimal") -> str:
     raise ValueError(f"Unbekannter IOA-Anzeigemodus: {mode}")
 
 
+def parse_ioa(text: str, mode: str = "decimal") -> int:
+    """Parse a decimal IOA or a structured three-octet IOA in display order."""
+    value_text = text.strip()
+    if "-" not in value_text:
+        try:
+            value = int(value_text, 0)
+        except ValueError as error:
+            raise ValueError("IOA muss dezimal oder als drei Oktette eingegeben werden") from error
+    else:
+        try:
+            parts = tuple(int(part.strip(), 0) for part in value_text.split("-"))
+        except ValueError as error:
+            raise ValueError("Strukturierte IOA enthält ungültige Oktette") from error
+        if len(parts) != 3 or any(not 0 <= part <= 255 for part in parts):
+            raise ValueError("Strukturierte IOA muss aus drei Oktetten von 0 bis 255 bestehen")
+        if mode == "winpp":
+            low, middle, high = parts
+        elif mode == "siemens":
+            high, middle, low = parts
+        else:
+            raise ValueError("Für eine strukturierte IOA bitte WinPP oder Siemens auswählen")
+        value = low | (middle << 8) | (high << 16)
+    if not 0 <= value <= 0xFFFFFF:
+        raise ValueError("IOA muss zwischen 0 und 16777215 liegen")
+    return value
+
+
 def cp56_text(data: bytes) -> str:
     if len(data) < 7:
         return ""

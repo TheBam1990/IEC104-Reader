@@ -11,7 +11,7 @@ import sys
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 
-from iec104.protocol import COT_NAMES, TYPE_NAMES, build_command, decode_asdu, format_ioa, hex_bytes
+from iec104.protocol import COT_NAMES, TYPE_NAMES, build_command, decode_asdu, format_ioa, hex_bytes, parse_ioa
 from iec104.send_dialog import SendDialog
 from iec104.table_filter import matches_filters
 from iec104.tcp_worker import TCPWorker
@@ -227,7 +227,9 @@ class ReaderApp(tk.Tk):
 
     def open_send_dialog(self) -> None:
         SendDialog(self, lambda: self.connection_values()[2], self.originator_value,
-                   self.send_dialog_command, self.send_dialog_asdu)
+                   self.send_dialog_command, self.send_dialog_asdu,
+                   lambda text: parse_ioa(text, self.ioa_display_mode()),
+                   lambda: self.ioa_display.get())
 
     def send_dialog_command(self, type_id: int, ioa: int, value, select: bool, description: str):
         try:
