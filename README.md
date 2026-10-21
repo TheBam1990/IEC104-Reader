@@ -1,7 +1,8 @@
 # IEC104 Reader für Windows
 
 Portable grafische Anwendung zum Lesen, Analysieren und kontrollierten Senden von IEC 60870-5-104 über TCP/IP.
-https://github.com/TheBam1990/IEC104-Reader/releases/tag/v1.4.0
+Version 1.5.0: Optionales TXT-Änderungslog für die Wertetabelle. Außerdem: Die Wertetabelle aktualisiert bestehende Punkte anhand von CA und IOA, auch bei wechselnder Übertragungsursache oder wechselndem ASDU-Typ.
+https://github.com/TheBam1990/IEC104-Reader/releases/tag/v1.5.0
 
 ## Oberfläche
 
@@ -19,6 +20,7 @@ https://github.com/TheBam1990/IEC104-Reader/releases/tag/v1.4.0
 - vollständige RX-/TX-Anzeige in Hexadezimaldarstellung
 - Sitzungslog `IEC104-Telegrammverkehr.txt` neben der EXE; wird bei jedem Start neu begonnen
 - Wertetabelle mit getrennten Spalten für CA/ASDU und IOA sowie ASDU-Typ, Übertragungsursache, Empfangswert, Qualität und Zeitstempel
+- Pro CA/IOA genau eine Zeile: neue Telegramme aktualisieren Wert, Typ, Übertragungsursache, Qualität und Zeitstempel, auch bei wechselnder Übertragungsursache oder wechselndem ASDU-Typ.
 - umschaltbare IOA-Darstellung: unstrukturiert dezimal, WinPP/Telegramm
   (IOA1-IOA2-IOA3, Low Byte zuerst) oder Siemens (IOA3-IOA2-IOA1,
   Darstellung A-B-C)
@@ -49,6 +51,12 @@ https://github.com/TheBam1990/IEC104-Reader/releases/tag/v1.4.0
 6. Empfangene Werte erscheinen rechts in der Tabelle.
 
 Die Filterfelder befinden sich direkt über den jeweiligen Spalten. Mehrere ausgefüllte Filter werden als UND-Verknüpfung ausgewertet. Mit **Alle Filter löschen** oder Escape werden alle Zeilen wieder eingeblendet.
+
+### Tabellenänderungen als TXT mitloggen
+
+Die Checkbox **Tabellenänderungen als TXT mitloggen** öffnet eine Dateiauswahl. Ab dann werden neue Punkte und Änderungen von Wert, ASDU-Typ, Übertragungsursache, Qualität oder Einheit protokolliert. Unveränderte Wiederholungen werden ausgelassen, auch wenn Zeitstempel und Empfangszähler weiterlaufen. Bereits vorhandene unveränderte Punkte werden beim Einschalten nicht nachträglich geschrieben.
+
+Das UTF-8-TXT enthält tabulatorgetrennte Spalten mit Logzeit, NEU/GEÄNDERT und allen Spalten der Wertetabelle einschließlich CA, IOA, Qualitätsflags und Zeitstempel. Die aktiven Tabellenfilter werden berücksichtigt. Filteränderungen und das Umschalten der IOA-Darstellung erzeugen selbst keine Logeinträge. Bestehende Dateien werden ergänzt. Zum Beenden die Checkbox abwählen; beim Schließen des Programms wird die Datei ebenfalls geschlossen. Bei Schreibfehlern wird das Tabellenlog mit Fehlermeldung gestoppt.
 
 ### Strukturierte IOA-Darstellung
 

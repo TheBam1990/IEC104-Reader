@@ -403,7 +403,7 @@ def decode_asdu(data: bytes) -> list[Value]:
         value, quality, source_timestamp, quality_raw = decode_value(kind, data[offset:offset + size])
         offset += size
         values.append(Value(
-            key=f"CA{common_address}:IOA{ioa}:T{type_id}", common_address=common_address,
+            key=f"CA{common_address}:IOA{ioa}", common_address=common_address,
             ioa=ioa, type_id=type_id, type_name=TYPE_NAMES.get(type_id, f"Typ {type_id}"),
             cause=cause, cause_name=COT_NAMES.get(cause, f"COT {cause}"), value=value,
             quality=quality, quality_raw=quality_raw, source_timestamp=source_timestamp,
