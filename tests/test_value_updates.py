@@ -55,25 +55,25 @@ class ValueUpdateTests(unittest.TestCase):
         ReaderApp.update_value(self.app, third, 'time-3', increment=False)
         self.assertEqual(next(iter(self.app.table.rows.values()))[-1], 3)
 
-    def test_log_only_meaningful_received_changes(self):
+    def test_log_all_received_values_including_repeated_gi(self):
         logged = []
         self.app.table_log = True
         self.app.log_table_change = logged.append
         first = self.receive()
         self.receive()
-        self.assertEqual(len(logged), 1)
+        self.assertEqual(len(logged), 2)
         self.receive(value=70)
         self.receive(cause=3, value=70)
         changed = replace(first, quality_raw=128, quality="IV")
         ReaderApp.update_value(self.app, changed, "quality-time")
-        self.assertEqual(len(logged), 4)
+        self.assertEqual(len(logged), 5)
         ReaderApp.update_value(self.app, changed, "redraw", increment=False)
-        self.assertEqual(len(logged), 4)
+        self.assertEqual(len(logged), 5)
         self.app.table_log = None
         self.receive(value=90)
         self.app.table_log = True
         self.receive(value=90)
-        self.assertEqual(len(logged), 4)
+        self.assertEqual(len(logged), 6)
 
     def test_other_ca_or_ioa_create_separate_rows(self):
         self.receive()

@@ -17,7 +17,7 @@ from iec104.table_filter import matches_filters
 from iec104.tcp_worker import TCPWorker
 
 APP_NAME = "IEC104 Reader"
-APP_VERSION = "1.5.0"
+APP_VERSION = "1.5.1"
 CONFIG_FILE = Path.home() / "IEC104-Reader.json"
 
 
@@ -112,7 +112,7 @@ class ReaderApp(tk.Tk):
         ttk.Button(toolbar, text="Alle Filter löschen", command=self.clear_table_filters).pack(side=tk.RIGHT, padx=3)
         ttk.Label(toolbar, text="IOA-Anzeige:").pack(side=tk.LEFT, padx=(0, 4))
         self.ioa_selector = ttk.Combobox(
-            toolbar, textvariable=self.ioa_display, state="readonly", width=48,
+            toolbar, textvariable=self.ioa_display, state="readonly", width=40,
             values=(
                 "Unstrukturiert (dezimal)",
                 "Strukturiert WinPP/Telegramm (IOA1-IOA2-IOA3)",
@@ -122,11 +122,10 @@ class ReaderApp(tk.Tk):
         self.ioa_selector.pack(side=tk.LEFT, padx=3)
         self.ioa_selector.bind("<<ComboboxSelected>>", self.change_ioa_display)
 
-        logbar = ttk.Frame(self, padding=(8, 3))
-        logbar.pack(fill=tk.X)
-        ttk.Checkbutton(logbar, text="Tabellenänderungen als TXT mitloggen",
-                        variable=self.table_logging, command=self.toggle_table_log).pack(side=tk.LEFT)
-        ttk.Label(logbar, text="Nur sichtbare Punkte; unveränderte Wiederholungen werden ausgelassen.").pack(side=tk.LEFT, padx=12)
+        self.table_log_checkbox = ttk.Checkbutton(
+            toolbar, text="Tabelle als TXT mitloggen", variable=self.table_logging,
+            command=self.toggle_table_log)
+        self.table_log_checkbox.pack(side=tk.LEFT, padx=8)
 
         split = ttk.Panedwindow(self, orient=tk.HORIZONTAL)
         split.pack(fill=tk.BOTH, expand=True, padx=8, pady=4)
@@ -356,10 +355,8 @@ class ReaderApp(tk.Tk):
                value.quality, f"0x{quality_raw:02X}", flag(0x01), flag(0x10), flag(0x20),
                flag(0x40), flag(0x80), value.unit, timestamp, 1)
         current = self.rows.get(value.key)
-        previous = None
         if current:
             old = self.table.item(current, "values")
-            previous = tuple(str(cell) for cell in old[:13])
             row = row[:-1] + (int(old[-1]) + (1 if increment else 0),)
             self.table.item(current, values=row)
             self.table.move(current, "", 0)
@@ -368,7 +365,7 @@ class ReaderApp(tk.Tk):
             self.rows[value.key] = current
         self.latest_values[value.key] = (value, timestamp)
         self.apply_table_filter()
-        if increment and getattr(self, "table_log", None) and previous != tuple(str(cell) for cell in row[:13]):
+        if increment and getattr(self, "table_log", None):
             self.log_table_change(row)
 
     def toggle_table_log(self) -> None:
@@ -377,9 +374,9 @@ class ReaderApp(tk.Tk):
             self.status.set("Tabellenlog beendet")
             return
         filename = filedialog.asksaveasfilename(
-            parent=self, title="TXT-Datei für Tabellenänderungen auswählen",
+            parent=self, title="TXT-Datei für Tabellenempfang auswählen",
             initialdir=application_directory(),
-            initialfile=f"IEC104-Werteaenderungen-{datetime.now():%Y%m%d-%H%M%S}.txt",
+            initialfile=f"IEC104-Werteempfang-{datetime.now():%Y%m%d-%H%M%S}.txt",
             defaultextension=".txt", filetypes=[("Textdateien", "*.txt")],
             confirmoverwrite=False,
         )
@@ -390,7 +387,7 @@ class ReaderApp(tk.Tk):
             self.table_log = open(filename, "a", newline="", encoding="utf-8", buffering=1)
             self.table_log.write(f"\n# {APP_NAME} {APP_VERSION} - Tabellenlog {datetime.now():%Y-%m-%d %H:%M:%S}\n")
             self.table_log_writer = csv.writer(self.table_log, delimiter="\t")
-            self.table_log_writer.writerow(["Logzeit", "Änderung"] +
+            self.table_log_writer.writerow(["Logzeit", "Ereignis"] +
                                           [self.table.heading(column, "text") for column in self.table["columns"]])
             self.status.set(f"Tabellenlog aktiv: {filename}")
         except OSError as error:
@@ -398,13 +395,9 @@ class ReaderApp(tk.Tk):
             messagebox.showerror(APP_NAME, f"Tabellenlog konnte nicht geöffnet werden: {error}", parent=self)
 
     def log_table_change(self, row) -> None:
-        active = {i: self.column_filters[name].get() for i, name in enumerate(self.table["columns"])
-                  if self.column_filters[name].get().strip()}
-        if not matches_filters(row, active):
-            return
         try:
             self.table_log_writer.writerow([datetime.now().isoformat(sep=" ", timespec="milliseconds"),
-                                           "NEU" if row[-1] == 1 else "GEÄNDERT"] + list(row))
+                                           "NEU" if row[-1] == 1 else "EMPFANGEN"] + list(row))
         except OSError as error:
             self.close_table_log()
             self.status.set(f"Tabellenlog gestoppt: {error}")
