@@ -17,7 +17,7 @@ from iec104.table_filter import matches_filters
 from iec104.tcp_worker import TCPWorker
 
 APP_NAME = "IEC104 Reader"
-APP_VERSION = "1.5.1"
+APP_VERSION = "1.5.2"
 CONFIG_FILE = Path.home() / "IEC104-Reader.json"
 
 

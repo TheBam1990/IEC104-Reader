@@ -1,4 +1,4 @@
-name: Build portable Windows EXE
+name: Build portable Windows folder
 
 on:
   push:
@@ -20,8 +20,24 @@ jobs:
       - run: pip install -r requirements-build.txt
       - run: python -m unittest discover -s tests -v
       - run: pyinstaller --clean --noconfirm IEC104-Reader.spec
+      - run: python tools/package_windows.py
+      - name: Verify packaged application starts
+        shell: pwsh
+        run: |
+          $readerProcess = Start-Process -FilePath ./dist/IEC104-Reader/IEC104-Reader.exe -PassThru
+          try {
+            Start-Sleep -Seconds 5
+            $readerProcess.Refresh()
+            if ($readerProcess.HasExited) {
+              throw "IEC104 Reader exited during startup: $($readerProcess.ExitCode)"
+            }
+          } finally {
+            if (-not $readerProcess.HasExited) { Stop-Process -Id $readerProcess.Id }
+          }
       - uses: actions/upload-artifact@v4
         with:
           name: IEC104-Reader-Windows-portable
-          path: dist/IEC104-Reader.exe
+          path: |
+            dist/IEC104-Reader-*-Windows-portable.zip
+            dist/SHA256SUMS-*.txt
           if-no-files-found: error

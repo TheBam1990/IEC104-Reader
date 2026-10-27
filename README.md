@@ -1,8 +1,8 @@
 # IEC104 Reader für Windows
 
 Portable grafische Anwendung zum Lesen, Analysieren und kontrollierten Senden von IEC 60870-5-104 über TCP/IP.
-Version 1.5.1: TXT-Empfangslog für alle Tabellenwerte einschließlich Generalabfragen und unveränderter Wiederholungen.
-https://github.com/TheBam1990/IEC104-Reader/releases/tag/v1.5.1
+Version 1.5.2: Windows-Programmordner ohne Selbstentpacken und ohne UPX, mit Versionsinformationen und SHA256-Prüfsummen. Die IEC104-Funktionen sind unverändert.
+https://github.com/TheBam1990/IEC104-Reader/releases/tag/v1.5.2
 
 ## Oberfläche
 
@@ -10,7 +10,7 @@ https://github.com/TheBam1990/IEC104-Reader/releases/tag/v1.5.1
 
 ## Funktionen
 
-- einzelne portable `IEC104-Reader.exe` ohne Installation
+- portabler Programmordner mit `IEC104-Reader.exe`, ohne Installation
 - Ziel-IP/Hostname, TCP-Port und Common Address einstellbar
 - STARTDT und Generalabfrage
 - optionale Generalabfrage direkt nach dem Verbinden
@@ -42,6 +42,12 @@ https://github.com/TheBam1990/IEC104-Reader/releases/tag/v1.5.1
 - lokale Speicherung der Verbindungseinstellungen und Faktoren
 
 ## Bedienung
+
+Das Windows-ZIP vollständig in einen eigenen, beschreibbaren Ordner entpacken und darin
+`IEC104-Reader.exe` starten. Der Unterordner `_internal` gehört zum Programm und muss
+neben der EXE bleiben. Nicht nur die EXE aus dem ZIP herauskopieren. Python muss auf
+dem Zielrechner nicht installiert sein. Für den normalen Betrieb sind keine
+Administratorrechte erforderlich.
 
 1. IP-Adresse oder Hostnamen des IEC104-Servers eintragen.
 2. TCP-Port eintragen, normalerweise `2404`.
@@ -108,13 +114,37 @@ Unbekannte ASDUs bleiben vollständig im Telegrammfenster sichtbar, auch wenn da
 - Es verwendet keine Cloud-Dienste und keine Telemetrie.
 - Einstellungen und Faktoren werden ausschließlich lokal gespeichert.
 
+### Virenschutz und nachvollziehbare Windows-Builds
+
+Ab 1.5.2 werden Python und Bibliotheken im Programmordner mitgeliefert. Das Programm
+entpackt beim Start kein eingebettetes Laufzeitpaket in einen temporären Ordner.
+UPX-Komprimierung ist im Build ausdrücklich ausgeschaltet. Die EXE enthält feste
+Produkt- und Versionsangaben. Der Lieferumfang enthält `BUILD-INFO.json` mit
+Build-Versionen und Quellcode-Prüfsummen sowie `SHA256SUMS.txt` für die Paketdateien.
+Die Prüfsumme des Download-ZIPs steht zusätzlich neben dem Download.
+
+Das Windows-Paket ist derzeit **nicht Authenticode-signiert**. Versionsangaben und
+Prüfsummen ersetzen keine digitale Herausgebersignatur. Für einen signierten Build
+wird ein gültiges Codesignatur-Zertifikat des Herausgebers benötigt.
+
+Diese Änderungen machen die Auslieferung transparenter; sie garantieren keine
+Freigabe durch SentinelOne oder andere Schutzsoftware. Für die Klärung eines
+Fehlalarms werden Dateiversion, SHA256, Erkennungsname und Auslösezeitpunkt benötigt.
+Die zuständige IT kann die konkrete Datei mit diesen Angaben beim Hersteller zur
+Prüfung einreichen. Schutzsoftware und Unternehmensrichtlinien werden durch das
+Programm nicht verändert.
+
 ## EXE selbst bauen
 
 Unter Windows `build-windows.bat` starten. Das Ergebnis liegt anschließend unter:
 
 ```text
-dist\IEC104-Reader.exe
+dist\IEC104-Reader\IEC104-Reader.exe
+dist\IEC104-Reader-1.5.2-Windows-portable.zip
 ```
+
+Der Windows-CI-Build führt die Tests aus, baut dasselbe Ordnerpaket und prüft, ob
+die erzeugte EXE startet. Zum Weitergeben das vollständige ZIP verwenden.
 
 ## Lizenz
 
