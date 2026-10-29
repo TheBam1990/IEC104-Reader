@@ -4,6 +4,10 @@ Portable grafische Anwendung zum Lesen, Analysieren und kontrollierten Senden vo
 Version 1.5.2: Windows-Programmordner ohne Selbstentpacken und ohne UPX, mit Versionsinformationen und SHA256-Prüfsummen. Die IEC104-Funktionen sind unverändert.
 https://github.com/TheBam1990/IEC104-Reader/releases/tag/v1.5.2
 
+**[Windows-Installer herunterladen (.exe)](https://github.com/TheBam1990/IEC104-Reader/releases/download/v1.5.2/IEC104-Reader-Setup.exe)**
+
+Bei „Failed to load Python DLL python312.dll“: Die EXE ab Version 1.5.2 benötigt den vollständigen Programmordner einschließlich `_internal`. Die einzelne EXE allein reicht nicht. Entweder das Windows-ZIP komplett entpacken und die EXE im entpackten Ordner starten oder den Installer verwenden. Der Installer legt alle benötigten Dateien zusammen ab und erstellt Verknüpfungen; er installiert für den aktuellen Benutzer ohne Administratorrechte. Der Windows-Programmcode bleibt Version 1.5.2.
+
 ## Oberfläche
 
 ![IEC104 Reader 1.4.0 mit wählbarer strukturierter IOA und Qualitätskennzeichen](docs/iec104-reader-1.4.0.png)
